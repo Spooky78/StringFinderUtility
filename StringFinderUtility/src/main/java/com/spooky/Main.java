@@ -19,6 +19,10 @@ public class Main {
         }
     }
 
+    static String parseDirOption(String[] args) {
+        return null;
+    }
+
     static Option createOption(String shortName, String longName, String argName, String description, boolean required) {
         return Option.builder(shortName)
                 .longOpt(longName)
