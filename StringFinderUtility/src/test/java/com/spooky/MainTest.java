@@ -6,29 +6,30 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MainTest {
 
     @Test
-    void testAbsolutePathValid() throws Exception {
+    void testAbsolutePathValid() throws ParseException {
         String absPath = new File(".").getAbsolutePath(); // current working dir
         String[] args = {"-d", absPath};
 
-        String dir = Main.parseDirOption(args);
+        Path dir = Main.determineSearchDirectory(args);
 
-        assertEquals(new File(absPath).getPath(), dir);
+        assertEquals(new File(absPath).getPath(), dir.toString());
     }
 
     @Test
-    void testRelativePathValid() throws Exception {
+    void testRelativePathValid() throws ParseException {
         String relPath = "."; // relative path to current dir
         String[] args = {"-d", relPath};
 
-        String dir = Main.parseDirOption(args);
+        Path dir = Main.determineSearchDirectory(args);
 
-        assertEquals(new File(relPath).getPath(), dir);
+        assertEquals(new File(relPath).getPath(), dir.toString());
     }
 
     @Test
@@ -38,7 +39,7 @@ class MainTest {
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> Main.parseDirOption(args)
+                () -> Main.determineSearchDirectory(args)
         );
         assertTrue(ex.getMessage().contains("Invalid directory"));
     }
@@ -51,9 +52,9 @@ class MainTest {
 
         String[] args = {}; // no -d
 
-        String dir = Main.parseDirOption(args);
+        Path dir = Main.determineSearchDirectory(args);
 
-        assertEquals(new File(".").getPath(), dir);
+        assertEquals(new File(".").getPath(), dir.toString());
     }
 
 }
