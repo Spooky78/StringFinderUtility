@@ -31,8 +31,9 @@ public class Main {
 
         } else {
                 System.out.println("No directory was given to search, please give one:");
-                Scanner scanner = new Scanner(System.in);
+            try (Scanner scanner = new Scanner(System.in)) {
                 dirToSearch = scanner.nextLine().trim();
+            }
         }
 
         Path path = Paths.get(dirToSearch);
