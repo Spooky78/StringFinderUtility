@@ -30,7 +30,7 @@ public class Main {
             dirToSearch = commandLine.getOptionValue(dirToSearchArg);
 
         } else {
-                System.out.println("No directory was given to search, please give one:");
+            System.out.println("No directory was given to search, please give one:");
             try (Scanner scanner = new Scanner(System.in)) {
                 dirToSearch = scanner.nextLine().trim();
             }
