@@ -48,6 +48,10 @@ public class Main {
         return path;
     }
 
+    public static SearchSpecification determineSearch(CommandLine cmd, Option dirOption) {
+        return null;
+    }
+
     static Option createOption(String shortName, String longName, String argName, String description, boolean required) {
         return Option.builder(shortName)
                 .longOpt(longName)
@@ -57,4 +61,5 @@ public class Main {
                 .required(required)
                 .build();
     }
+
 }

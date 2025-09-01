@@ -50,7 +50,8 @@ class MainTest {
         assertAll(() -> {
             try {
                 Main.main(args);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             assertTrue(errContent.toString().contains("Error parsing command line arguments"));
         });
     }
@@ -142,6 +143,144 @@ class MainTest {
 
         assertThrows(IllegalArgumentException.class, () -> Main.determineSearchDirectory(cmd, dirOption));
     }
+
+    //endregion
+
+    //region DetermineSearch
+
+    @Test
+    void testDetermineSearchStringWithValidString() throws ParseException {
+        String testSearchString = "testSearchString";
+        var options = new Options();
+        var dirOption = Main.createOption("s", "str", "STR", "String to search for", false);
+        options.addOption(dirOption);
+
+        String[] args = {"-s", testSearchString};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        SearchSpecification result = Main.determineSearch(cmd, dirOption);
+        assertNotNull(result);
+        assertEquals(testSearchString, result.getValue());
+    }
+
+    @Test
+    void testDetermineSearchRegexWithValidRegex() throws ParseException {
+        String testSearchString = "test(Search)String";
+        var options = new Options();
+        var dirOption = Main.createOption("r", "reg", "REG", "Regex to search for", false);
+        options.addOption(dirOption);
+
+        String[] args = {"-r", testSearchString};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        SearchSpecification result = Main.determineSearch(cmd, dirOption);
+        assertNotNull(result);
+        assertEquals(testSearchString, result.getValue());
+    }
+
+    @Test
+    void testDetermineSearchWithBothFlagsThrows() throws ParseException {
+        String testSearchString = "search";
+        var options = new Options();
+        var searchOption = Main.createOption("s", "str", "STR", "String to search for", false);
+        var regexOption = Main.createOption("r", "reg", "REG", "Regex to search for", false);
+        options.addOption(searchOption);
+        options.addOption(regexOption);
+
+        String[] args = {"-s", testSearchString, "-r", testSearchString};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        assertThrows(IllegalArgumentException.class, () -> Main.determineSearch(cmd, searchOption));
+    }
+
+    @Test
+    void testDetermineSearchWithNoSearchPromptsUser() {
+        // Simulate prompt by setting System.in
+        InputStream originalIn = System.in;
+        String testSearchString = "promptedString";
+        try {
+            System.setIn(new ByteArrayInputStream((testSearchString + System.lineSeparator()).getBytes()));
+            var options = new Options();
+            var searchOption = Main.createOption("s", "str", "STR", "String to search for", false);
+            options.addOption(searchOption);
+
+            String[] args = {};
+            CommandLineParser parser = new DefaultParser();
+            CommandLine cmd = parser.parse(options, args);
+
+            SearchSpecification result = Main.determineSearch(cmd, searchOption);
+            assertNotNull(result);
+            assertEquals(testSearchString, result.getValue());
+        } finally {
+            System.setIn(originalIn);
+        }
+    }
+
+    @Test
+    void testDetermineSearchWithIgnoreCaseString() throws ParseException {
+        String testSearchString = "search";
+        var options = new Options();
+        var searchOption = Main.createOption("s", "str", "STR", "String to search for", false);
+        var ignoreCaseOption = Main.createOption(null, "ignore-case", null, "Ignore case", false);
+        options.addOption(searchOption);
+        options.addOption(ignoreCaseOption);
+
+        String[] args = {"-s", testSearchString, "--ignore-case"};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        SearchSpecification result = Main.determineSearch(cmd, searchOption);
+        assertNotNull(result);
+        assertFalse(result.isCaseSensitive());
+    }
+
+    @Test
+    void testDetermineSearchWithIgnoreCaseRegex() throws ParseException {
+        String testSearchString = "search.*";
+        var options = new Options();
+        var regexOption = Main.createOption("r", "reg", "REG", "Regex to search for", false);
+        var ignoreCaseOption = Main.createOption(null, "ignore-case", null, "Ignore case", false);
+        options.addOption(regexOption);
+        options.addOption(ignoreCaseOption);
+
+        String[] args = {"-r", testSearchString, "--ignore-case"};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        SearchSpecification result = Main.determineSearch(cmd, regexOption);
+        assertFalse(result.isCaseSensitive());
+    }
+
+    @Test
+    void testDetermineSearchWithInvalidRegexThrows() throws ParseException {
+        String invalidRegex = "[unterminated";
+        var options = new Options();
+        var regexOption = Main.createOption("r", "reg", "REG", "Regex to search for", false);
+        options.addOption(regexOption);
+
+        String[] args = {"-r", invalidRegex};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        assertThrows(IllegalArgumentException.class, () -> Main.determineSearch(cmd, regexOption));
+    }
+
+    @Test
+    void testDetermineSearchWithEmptyStringThrows() throws ParseException {
+        var options = new Options();
+        var searchOption = Main.createOption("s", "str", "STR", "String to search for", false);
+        options.addOption(searchOption);
+
+        String[] args = {"-s", ""};
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        assertThrows(IllegalArgumentException.class, () -> Main.determineSearch(cmd, searchOption));
+    }
+
 
     //endregion
 
