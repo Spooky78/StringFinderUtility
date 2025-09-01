@@ -8,16 +8,15 @@ import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class Main {
-    public static void main(String[] args) throws ParseException {
+    public static void main(String[] args) {
         try {
-            Path dirToSearchPath = determineSearchDirectory(args);
+            run(args);
         } catch (ParseException e) {
             System.err.println("Error parsing command line arguments " + e.getMessage());
-            System.exit(1);
         }
     }
 
-    static Path determineSearchDirectory(String[] args) throws ParseException {
+    static void run(String[] args) throws ParseException {
         Options options = new Options();
         Option dirToSearchArg = createOption("d", "dir", "DIR", "Directory To Search", false);
         options.addOption(dirToSearchArg);
@@ -25,6 +24,10 @@ public class Main {
         CommandLineParser commandLineParser = new DefaultParser();
         CommandLine commandLine = commandLineParser.parse(options, args);
 
+        Path dirToSearchPath = determineSearchDirectory(commandLine, dirToSearchArg);
+    }
+
+    static Path determineSearchDirectory(CommandLine commandLine, Option dirToSearchArg) {
         String dirToSearch;
         if (commandLine.hasOption("d")) {
             dirToSearch = commandLine.getOptionValue(dirToSearchArg);
