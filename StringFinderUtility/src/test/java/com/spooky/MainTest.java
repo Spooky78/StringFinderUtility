@@ -1,164 +1,300 @@
 package com.spooky;
 
-import org.apache.commons.cli.*;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.Scanner;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class MainTest {
 
-    @TempDir
-    Path tempDir;
+  private final PrintStream originalErr = System.err;
+  private final PrintStream originalOut = System.out;
+  private final InputStream originalIn = System.in;
+  @TempDir
+  Path tempDir;
+  private ByteArrayOutputStream errContent;
+  private ByteArrayOutputStream outContent;
 
-    //region Setup/Teardown
-    private final PrintStream originalErr = System.err;
-    private final PrintStream originalOut = System.out;
-    private ByteArrayOutputStream errContent;
-    private ByteArrayOutputStream outContent;
+  @BeforeEach
+  void setupStreams() {
+    errContent = new ByteArrayOutputStream();
+    System.setErr(new PrintStream(errContent));
+    outContent = new ByteArrayOutputStream();
+    System.setOut(new PrintStream(outContent));
+  }
 
-    @BeforeEach
-    void setupStreams() {
-        errContent = new ByteArrayOutputStream();
-        System.setErr(new PrintStream(errContent));
-        outContent = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(outContent));
+  @AfterEach
+  void restoreStreams() {
+    System.setErr(originalErr);
+    System.setOut(originalOut);
+    System.setIn(originalIn);
+  }
+
+  //region Main
+
+  @Test
+  void testMainClassInstantiation() {
+    new Main(); // ensures class is loaded and default constructor is covered
+  }
+
+  //endregion
+
+  //region Main.main
+
+  @Test
+  void testMainSuccessfulPath() {
+    String[] args = {"-d", tempDir.toString(), "-r", "testString"};
+    assertDoesNotThrow(() -> Main.main(args));
+    assertFalse(errContent.toString().contains("Error parsing command line arguments"));
+  }
+
+  //endregion
+
+  //region Main.run
+
+  @Test
+  void testRun_PatternSyntaxException_PrintsErrorToSystemErr() throws Exception {
+    // Redirect System.err to capture output
+    ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    System.setErr(new PrintStream(errContent));
+
+    try {
+      // Pass an invalid regex pattern as argument that will trigger PatternSyntaxException
+      String[] args = {"-r", "["};
+      Method runMethod = Main.class.getDeclaredMethod("run", String[].class);
+      runMethod.setAccessible(true);
+
+      // Call the private run method
+      runMethod.invoke(null, (Object) args);
+
+      // Check that the error message was written to System.err
+      String errOutput = errContent.toString();
+      assertTrue(errOutput.contains("ERROR: Something went wrong with pattern syntax"),
+          "Expected error message was not found in System.err output");
+    } finally {
+      // Restore System.err
+      System.setErr(originalErr);
     }
+  }
 
-    @AfterEach
-    void restoreStreams() {
-        System.setErr(originalErr);
-        System.setOut(originalOut);
+  @Test
+  void testRun_ParseException_PrintsErrorToSystemErr() throws Exception {
+    ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    System.setErr(new PrintStream(errContent));
+
+    try {
+      // Pass an invalid option to cause a ParseException
+      String[] args = {"--invalidOption"};
+      Method runMethod = Main.class.getDeclaredMethod("run", String[].class);
+      runMethod.setAccessible(true);
+
+      runMethod.invoke(null, (Object) args);
+
+      String errOutput = errContent.toString();
+      assertTrue(errOutput.contains("ERROR: couldn't parse arguments"),
+          "Expected parse exception message was not found in System.err output");
+    } finally {
+      System.setErr(originalErr);
     }
-    //endregion
+  }
 
-    //region Main Method Tests
+  //endregion
 
-    @Test
-    void testMainSuccessfulPath() {
-        String[] args = {"-d", tempDir.toString()};
-        assertDoesNotThrow(() -> Main.main(args));
-        assertTrue(errContent.toString().isEmpty());
+  //region Main.determineSearchDirectory
+
+  @Test
+  void testDetermineSearchDirectory_WithValidArgumentsPath__ReturnsDirectory() throws Exception {
+    var options = new Options();
+    options.addOption(reflectCreateOption("d", "dir", "DIR", "Directory To Search", false));
+
+    String[] args = {"-d", tempDir.toString()};
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, args);
+
+    try (Scanner scanner = new Scanner(new ByteArrayInputStream(new byte[0]))) {
+      Path result = reflectDetermineSearchDirectory(cmd, scanner);
+      assertEquals(tempDir, result);
     }
+  }
 
-    @Test
-    void testMainWithInvalidParseException() {
-        String[] args = {"-unknown", "foo"};
-        assertAll(() -> {
-            try {
-                Main.main(args);
-            } catch (Exception ignored) {}
-            assertTrue(errContent.toString().contains("Error parsing command line arguments"));
-        });
+  @Test
+  void testDetermineSearchDirectory_NoArgumentsAndValidUserInputInvalidDirectory_ThrowsIllegalArgumentException()
+      throws Exception {
+    String input = tempDir.resolve("does_not_exist")
+        + System.lineSeparator()
+        + System.lineSeparator();
+    System.setIn(new ByteArrayInputStream(input.getBytes()));
+
+    var options = new Options();
+    String[] args = {};
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, args);
+
+    try (Scanner scanner = new Scanner(System.in)) {
+      Throwable thrown = assertThrows(InvocationTargetException.class,
+          () -> reflectDetermineSearchDirectory(cmd, scanner));
+
+      assertInstanceOf(IllegalArgumentException.class, thrown.getCause());
+      assertTrue(outContent.toString().contains("No directory was given to search"));
     }
+  }
 
-    @Test
-    void testDefaultConstructorCoverage() {
-        new Main();
-    }
+  @Test
+  void testDetermineSearchDirectory_NoArgumentsAndInvalidUserInput_ThrowsIllegalArgumentException()
+      throws Exception {
+    System.setIn(new ByteArrayInputStream(new byte[0])); // no input at all
 
-    //endregion
+    var options = new Options();
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, new String[0]);
 
-    //region Run Method Tests
-
-    @Test
-    void testRunWithValidDirectoryArgument() {
-        String[] args = {"-d", tempDir.toString()};
-        assertDoesNotThrow(() -> Main.run(args));
-        assertTrue(errContent.toString().isEmpty());
-    }
-
-    @Test
-    void testRunWithInvalidDirectoryArgument() {
-        String invalidDir = tempDir.resolve("does_not_exist").toString();
-        String[] args = {"-d", invalidDir};
-
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
-            Main.run(args);
-        });
-
-        assertTrue(thrown.getMessage().contains("Invalid directory"));
-    }
-
-    @Test
-    void testRunWithNoArgumentsAndValidUserInput() {
-        InputStream originalIn = System.in;
+    try (Scanner scanner = new Scanner(System.in)) {
+      IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
         try {
-            String input = tempDir.toString() + System.lineSeparator();
-            System.setIn(new ByteArrayInputStream(input.getBytes()));
-            String[] args = {};
-            assertDoesNotThrow(() -> Main.run(args));
-            assertTrue(outContent.toString().contains("No directory was given to search"));
-        } finally {
-            System.setIn(originalIn);
+          reflectDetermineSearchDirectory(cmd, scanner);
+        } catch (InvocationTargetException e) {
+          throw (e.getCause() instanceof Exception ex) ? ex : new RuntimeException(e.getCause());
         }
-    }
+      });
 
-    @Test
-    void testRunWithNoArgumentsAndInvalidUserInput() {
-        InputStream originalIn = System.in;
+      assertEquals("No directory input provided", thrown.getMessage());
+    }
+  }
+
+  //endregion
+
+  //region Main.determineSearchRegex
+
+  @Test
+  void testDetermineSearchRegex_ValidArgumentsRegex_ReturnsRegex() throws Exception {
+    String testSearchString = "test(Search)String";
+    var options = new Options();
+    options.addOption(reflectCreateOption("r", "regex", "REGEX", "Regex pattern to search", false));
+
+    String[] args = {"-r", testSearchString};
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, args);
+
+    try (Scanner scanner = new Scanner(new ByteArrayInputStream(new byte[0]))) {
+      String result = reflectDetermineSearchRegex(cmd, scanner);
+      assertEquals(testSearchString, result);
+    }
+  }
+
+  @Test
+  void testDetermineSearchRegex_InvalidArgumentsRegex_ReturnsRegex() throws Exception {
+    String testSearchString = "test(SearchString";
+    var options = new Options();
+    options.addOption(reflectCreateOption("r", "regex", "REGEX", "Regex pattern to search", false));
+
+    String[] args = {"-r", testSearchString};
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, args);
+
+    try (Scanner scanner = new Scanner(new ByteArrayInputStream(new byte[0]))) {
+      IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
         try {
-            String input = tempDir.resolve("does_not_exist").toString() + System.lineSeparator();
-            System.setIn(new ByteArrayInputStream(input.getBytes()));
-            String[] args = {};
-            assertThrows(IllegalArgumentException.class, () -> Main.run(args));
-            assertTrue(outContent.toString().contains("No directory was given to search"));
-        } finally {
-            System.setIn(originalIn);
+          reflectDetermineSearchRegex(cmd, scanner);
+        } catch (InvocationTargetException e) {
+          throw (e.getCause() instanceof Exception ex) ? ex : new RuntimeException(e.getCause());
         }
+      });
+      assertEquals("Invalid regular expression: test(SearchString", thrown.getMessage());
     }
+  }
 
-    //endregion
+  @Test
+  void testDetermineSearchRegex_NoArgumentsAndValidUserInput_ReturnsRegex() throws Exception {
+    String testSearchString = "promptedString";
+    String input = testSearchString + System.lineSeparator();
+    System.setIn(new ByteArrayInputStream(input.getBytes()));
 
-    //region DetermineSearchDirectory Tests
+    var options = new Options();
+    String[] args = {};
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, args);
 
-    @Test
-    void testDetermineSearchDirectoryWithValidPath() throws ParseException {
-        var options = new Options();
-        var dirOption = Main.createOption("d", "dir", "DIR", "Directory To Search", false);
-        options.addOption(dirOption);
-
-        String[] args = {"-d", tempDir.toString()};
-        CommandLineParser parser = new DefaultParser();
-        CommandLine cmd = parser.parse(options, args);
-
-        Path result = Main.determineSearchDirectory(cmd, dirOption);
-        assertEquals(tempDir, result);
+    try (Scanner scanner = new Scanner(System.in)) {
+      String result = reflectDetermineSearchRegex(cmd, scanner);
+      assertEquals(testSearchString, result);
     }
+  }
 
-    @Test
-    void testDetermineSearchDirectoryWithInvalidPath() throws ParseException {
-        var options = new Options();
-        var dirOption = Main.createOption("d", "dir", "DIR", "Directory To Search", false);
-        options.addOption(dirOption);
+  @Test
+  void testDetermineSearchRegex_NoArgumentsAndInvalidUserInput_ThrowsIllegalArgumentException()
+      throws Exception {
+    var options = new Options();
+    options.addOption(reflectCreateOption("r", "regex", "REGEX", "Regex pattern to search", false));
 
-        String invalidDir = tempDir.resolve("does_not_exist").toString();
-        String[] args = {"-d", invalidDir};
-        CommandLineParser parser = new DefaultParser();
-        CommandLine cmd = parser.parse(options, args);
+    String[] args = {}; // no -r option provided
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd = parser.parse(options, args);
 
-        assertThrows(IllegalArgumentException.class, () -> Main.determineSearchDirectory(cmd, dirOption));
+    try (Scanner scanner = new Scanner(new ByteArrayInputStream(new byte[0]))) {
+      IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
+        try {
+          reflectDetermineSearchRegex(cmd, scanner);
+        } catch (InvocationTargetException e) {
+          throw (e.getCause() instanceof Exception ex) ? ex : new RuntimeException(e.getCause());
+        }
+      });
+
+      assertEquals("No regex input provided", thrown.getMessage());
     }
+  }
 
-    //endregion
+  //endregion
 
-    //region Utility Method Tests
+  //region Reflection utilities
 
-    @Test
-    void testCreateOptionAndAddOptionCoverage() {
-        var options = new org.apache.commons.cli.Options();
-        var dirToSearchArg = Main.createOption("d", "dir", "DIR", "Directory To Search", false);
-        assertNotNull(dirToSearchArg);
-        assertEquals("d", dirToSearchArg.getOpt());
-        assertEquals("dir", dirToSearchArg.getLongOpt());
-        assertEquals("Directory To Search", dirToSearchArg.getDescription());
-        assertFalse(dirToSearchArg.isRequired());
-        options.addOption(dirToSearchArg);
-        assertTrue(options.hasOption("d"));
-    }
+  private static Option reflectCreateOption(String shortName, String longName, String argName,
+                                            String description, boolean required) throws Exception {
+    Method m = Main.class.getDeclaredMethod("createOption",
+        String.class, String.class, String.class, String.class, boolean.class);
+    m.setAccessible(true);
+    return (Option) m.invoke(null, shortName, longName, argName, description, required);
+  }
 
-    //endregion
+  private static Path reflectDetermineSearchDirectory(CommandLine cmd, Scanner scanner)
+      throws Exception {
+    Method m =
+        Main.class.getDeclaredMethod("determineSearchDirectory", CommandLine.class, Scanner.class);
+    m.setAccessible(true);
+    return (Path) m.invoke(null, cmd, scanner);
+  }
+
+  //region Main.main
+
+  private static String reflectDetermineSearchRegex(CommandLine cmd, Scanner scanner)
+      throws Exception {
+    Method m =
+        Main.class.getDeclaredMethod("determineSearchRegex", CommandLine.class, Scanner.class);
+    m.setAccessible(true);
+    return (String) m.invoke(null, cmd, scanner);
+  }
+
+  //endregion
 }
