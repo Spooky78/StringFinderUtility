@@ -4,11 +4,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Scanner;
+import java.util.regex.PatternSyntaxException;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 /**
  * The main entry point for the StringFinderUtility application.
@@ -39,8 +41,10 @@ public class Main {
 
       String searchSpecification = determineSearchRegex(commandLine, scanner);
       Path dirToSearchPath = determineSearchDirectory(commandLine, scanner);
-    } catch (Exception e) {
-      System.err.println("ERROR: Something went wrong");
+    } catch (IllegalArgumentException e) {
+      System.err.println("ERROR: Something went wrong with pattern syntax");
+    } catch (ParseException e) {
+      System.err.println("ERROR: couldn't parse arguments");
     }
   }
 

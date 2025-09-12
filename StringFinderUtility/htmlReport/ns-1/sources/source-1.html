@@ -75,7 +75,7 @@ Current scope:     <a href="../../index.html">all classes</a>
     100%
   </span>
   <span class="absValue">
-    (39/39)
+    (40/40)
   </span>
 </td>
 </tr>
@@ -93,14 +93,24 @@ Current scope:     <a href="../../index.html">all classes</a>
 &nbsp;import java.nio.file.Path;
 &nbsp;import java.nio.file.Paths;
 &nbsp;import java.util.Scanner;
+&nbsp;import java.util.regex.PatternSyntaxException;
 &nbsp;import org.apache.commons.cli.CommandLine;
 &nbsp;import org.apache.commons.cli.CommandLineParser;
 &nbsp;import org.apache.commons.cli.DefaultParser;
 &nbsp;import org.apache.commons.cli.Option;
 &nbsp;import org.apache.commons.cli.Options;
+&nbsp;import org.apache.commons.cli.ParseException;
 &nbsp;
+&nbsp;/**
+&nbsp; * Main Class.
+&nbsp; */
 <b class="fc">&nbsp;public class Main {</b>
 &nbsp;
+&nbsp;  /**
+&nbsp;   * Main method that runs the program.
+&nbsp;   *
+&nbsp;   * @param args Program arguments
+&nbsp;   */
 &nbsp;  public static void main(String[] args) {
 <b class="fc">&nbsp;    run(args);</b>
 &nbsp;  }
@@ -114,8 +124,10 @@ Current scope:     <a href="../../index.html">all classes</a>
 &nbsp;
 <b class="fc">&nbsp;      String searchSpecification = determineSearchRegex(commandLine, scanner);</b>
 <b class="fc">&nbsp;      Path dirToSearchPath = determineSearchDirectory(commandLine, scanner);</b>
-&nbsp;    } catch (Exception e) {
-<b class="fc">&nbsp;      System.err.println(&quot;ERROR: Something went wrong&quot;);</b>
+&nbsp;    } catch (IllegalArgumentException e) {
+<b class="fc">&nbsp;      System.err.println(&quot;ERROR: Something went wrong with pattern syntax&quot;);</b>
+&nbsp;    } catch (ParseException e) {
+<b class="fc">&nbsp;      System.err.println(&quot;ERROR: couldn&#39;t parse arguments&quot;);</b>
 &nbsp;    }
 &nbsp;  }
 &nbsp;
@@ -208,7 +220,7 @@ Current scope:     <a href="../../index.html">all classes</a>
 
 <div class="footer">
     
-    <div style="float:right;">generated on 2025-09-11 20:46</div>
+    <div style="float:right;">generated on 2025-09-12 20:59</div>
 </div>
 </body>
 </html>

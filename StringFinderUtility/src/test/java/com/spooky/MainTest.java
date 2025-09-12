@@ -74,15 +74,15 @@ class MainTest {
   //region Main.run
 
   @Test
-  void testRunPrintsErrorMessageToSystemErr() throws Exception {
+  void testRun_PatternSyntaxException_PrintsErrorToSystemErr() throws Exception {
     // Redirect System.err to capture output
     ByteArrayOutputStream errContent = new ByteArrayOutputStream();
     PrintStream originalErr = System.err;
     System.setErr(new PrintStream(errContent));
 
     try {
-      // Use arguments that will cause an exception in run, e.g., unknown option
-      String[] args = {"--unknownOption"};
+      // Pass an invalid regex pattern as argument that will trigger PatternSyntaxException
+      String[] args = {"-r", "["};
       Method runMethod = Main.class.getDeclaredMethod("run", String[].class);
       runMethod.setAccessible(true);
 
@@ -91,10 +91,32 @@ class MainTest {
 
       // Check that the error message was written to System.err
       String errOutput = errContent.toString();
-      assertTrue(errOutput.contains("ERROR: Something went wrong"),
+      assertTrue(errOutput.contains("ERROR: Something went wrong with pattern syntax"),
           "Expected error message was not found in System.err output");
     } finally {
       // Restore System.err
+      System.setErr(originalErr);
+    }
+  }
+
+  @Test
+  void testRun_ParseException_PrintsErrorToSystemErr() throws Exception {
+    ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+    PrintStream originalErr = System.err;
+    System.setErr(new PrintStream(errContent));
+
+    try {
+      // Pass an invalid option to cause a ParseException
+      String[] args = {"--invalidOption"};
+      Method runMethod = Main.class.getDeclaredMethod("run", String[].class);
+      runMethod.setAccessible(true);
+
+      runMethod.invoke(null, (Object) args);
+
+      String errOutput = errContent.toString();
+      assertTrue(errOutput.contains("ERROR: couldn't parse arguments"),
+          "Expected parse exception message was not found in System.err output");
+    } finally {
       System.setErr(originalErr);
     }
   }
