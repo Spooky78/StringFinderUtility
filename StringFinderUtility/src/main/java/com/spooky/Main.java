@@ -11,7 +11,13 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 /**
- * Main Class.
+ * The main entry point for the StringFinderUtility application.
+ * <p>
+ * This application allows users to search for files within a specified directory
+ * that match a given regular expression pattern. Users can provide the directory
+ * and regex pattern as command-line arguments or interactively via prompts.
+ * The utility validates the inputs and prepares for searching files based on the
+ * provided criteria.
  */
 public class Main {
 
